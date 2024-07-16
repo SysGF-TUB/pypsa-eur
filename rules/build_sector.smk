@@ -244,6 +244,29 @@ rule build_cop_profiles:
         "../scripts/build_cop_profiles.py"
 
 
+rule build_heat_source_potentials:
+    params:
+        heat_sources=config_provider("sector", "district_heating", "heat_sources"),
+    input:
+        regions_onshore=resources("regions_onshore_elec_s{simpl}_{clusters}.geojson"),
+        # regions_onshore=resources("regions_onshore_elec_s_4.geojson"),
+    output:
+        heat_source_potentials=resources("heat_source_potentials_elec_s{simpl}_{clusters}.csv"),
+        # heat_sources=resources("heat_sources_elec_s_4.csv"),
+    resources:
+        mem_mb=20000,
+    threads: 8
+    log:
+        logs("build_heat_source_potentials_s{simpl}_{clusters}.log"),
+        # logs("build_heat_sources_s_4.log"),
+    benchmark:
+        benchmarks("build_heat_source_potentials/s{simpl}_{clusters}")
+        # benchmarks("build_heat_sources/s_4")
+    conda:
+        "../envs/environment.yaml"
+    script:
+        "../scripts/build_heat_source_potentials.py"
+
 def solar_thermal_cutout(wildcards):
     c = config_provider("solar_thermal", "cutout")(wildcards)
     if c == "default":
@@ -948,6 +971,7 @@ rule prepare_sector_network:
         countries=config_provider("countries"),
         adjustments=config_provider("adjustments", "sector"),
         emissions_scope=config_provider("energy", "emissions"),
+        heat_sources=config_provider("sector", "district_heating", "heat_sources"),
         RDIR=RDIR,
     input:
         unpack(input_profile_offwind),
@@ -1065,6 +1089,7 @@ rule prepare_sector_network:
             if config_provider("sector", "enhanced_geothermal", "enable")(w)
             else []
         ),
+        heat_source_potentials=resources("heat_source_potentials_elec_s{simpl}_{clusters}.csv"),
     output:
         RESULTS
         + "prenetworks/elec_s{simpl}_{clusters}_l{ll}_{opts}_{sector_opts}_{planning_horizons}.nc",
