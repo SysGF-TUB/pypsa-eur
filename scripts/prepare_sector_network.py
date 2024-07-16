@@ -2037,6 +2037,25 @@ def add_heat(n, costs):
                 p_max_pu=solar_thermal[nodes],
                 lifetime=costs.at[name_type + " solar thermal", "lifetime"],
             )
+        
+        if options["heat_sources"] and name == "urban central":
+            costs.to_csv("costs.csv")
+            heat_source_potentials = pd.read_csv(snakemake.input.heat_source_potentials, index_col=0)
+            for heat_source_key, heat_source_val in snakemake.params.heat_sources.items():
+                n.add("Carrier", name + " " + heat_source_key)
+
+                n.madd(
+                    "Generator",
+                    nodes,
+                    suffix=f" {name} {heat_source_key}",
+                    bus=nodes + f" {name} heat",
+                    carrier=name + " " + heat_source_key,
+                    p_nom_extendable=True,
+                    capital_cost=0.0,
+                    p_nom_max=heat_source_potentials.loc[nodes, heat_source_key] / len(n.snapshots),
+                    lifetime=1000,
+                )
+            
 
         if options["chp"] and name == "urban central":
             # add gas CHP; biomass CHP is added in biomass section
