@@ -407,6 +407,7 @@ sector:
   biomass: true
   industry: true
   agriculture: true
+  heat_sources: true
   district_heating:
     potential: 0.6
     progress:
@@ -421,17 +422,16 @@ sector:
     heat_sources:
       industrial_excess_heat: 
         source_data: https://fordatis.fraunhofer.de/bitstream/fordatis/341.3/4/industrial_eh.gpkg
-        data_columns: 
-          # - EH_55_GWh
-          - EH_95_GWh
+        data_column: EH_95_GWh
         temperature_celsius: 95
         source_type: soil
+        unit: GWh
       hydrothermal_85: 
         source_data: https://fordatis.fraunhofer.de/bitstream/fordatis/341.3/11/hydrothermal_85.gpkg
-        data_columns: 
-          - Energy_TWh
+        data_column: Energy_TWh
         temperature_celsius: 85
         source_type: soil
+        unit: TWh
   cluster_heat_buses: true
   heat_demand_cutout: default
   bev_dsm_restriction_value: 0.75
@@ -1116,8 +1116,8 @@ plotting:
     services urban decentral air heat pump: '#5af95d'
     services rural air heat pump: '#5af95d'
     urban central air heat pump: '#6cfb6b'
-    industrial_excess_heat heat pump: '#2fb539'
-    hydrothermal_85 heat pump: '#2fb538'
+    industrial_excess_heat: '#2fb539'
+    hydrothermal_85: '#2fb538'
     ground heat pump: '#2fb537'
     residential rural ground heat pump: '#48f74f'
     residential rural air heat pump: '#48f74f'
