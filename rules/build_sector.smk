@@ -249,19 +249,15 @@ rule build_heat_source_potentials:
         heat_sources=config_provider("sector", "district_heating", "heat_sources"),
     input:
         regions_onshore=resources("regions_onshore_elec_s{simpl}_{clusters}.geojson"),
-        # regions_onshore=resources("regions_onshore_elec_s_4.geojson"),
     output:
         heat_source_potentials=resources("heat_source_potentials_elec_s{simpl}_{clusters}.csv"),
-        # heat_sources=resources("heat_sources_elec_s_4.csv"),
     resources:
         mem_mb=20000,
     threads: 8
     log:
         logs("build_heat_source_potentials_s{simpl}_{clusters}.log"),
-        # logs("build_heat_sources_s_4.log"),
     benchmark:
         benchmarks("build_heat_source_potentials/s{simpl}_{clusters}")
-        # benchmarks("build_heat_sources/s_4")
     conda:
         "../envs/environment.yaml"
     script:

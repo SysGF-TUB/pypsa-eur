@@ -424,13 +424,13 @@ sector:
         source_data: https://fordatis.fraunhofer.de/bitstream/fordatis/341.3/4/industrial_eh.gpkg
         data_column: EH_95_GWh
         temperature_celsius: 95
-        source_type: soil
+        # source_type: soil
         unit: GWh
       hydrothermal_85: 
         source_data: https://fordatis.fraunhofer.de/bitstream/fordatis/341.3/11/hydrothermal_85.gpkg
         data_column: Energy_TWh
         temperature_celsius: 85
-        source_type: soil
+        # source_type: soil
         unit: TWh
   cluster_heat_buses: true
   heat_demand_cutout: default

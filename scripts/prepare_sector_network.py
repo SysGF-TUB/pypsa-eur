@@ -2039,7 +2039,6 @@ def add_heat(n, costs):
             )
         
         if options["heat_sources"] and name == "urban central":
-            costs.to_csv("costs.csv")
             heat_source_potentials = pd.read_csv(snakemake.input.heat_source_potentials, index_col=0)
             for heat_source_key, heat_source_val in snakemake.params.heat_sources.items():
                 n.add("Carrier", name + " " + heat_source_key)
