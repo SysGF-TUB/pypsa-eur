@@ -179,56 +179,6 @@ def get_preheater_utilisation_profile(
     )
 
 
-def get_heat_pump_cooling(
-    heat_source_name: str,
-    default_heat_source_cooling: float,
-    snakemake_input: dict,
-    return_temperature: xr.DataArray = None,
-) -> float | xr.DataArray:
-    """
-    Get the additional heat source cooling (temperature drop) through the heat pump for a heat source.
-
-    For PTES, this equals the temperature difference between
-    return flow and bottom layers (return_temperature - bottom_temperature), which can
-    be time-varying. For other sources, uses the default constant value.
-
-    Parameters
-    ----------
-    heat_source_name : str
-        Name of the heat source (e.g., 'ptes', 'geothermal', 'air').
-    default_heat_source_cooling : float
-        Default heat source cooling in Kelvin, from config.
-    snakemake_input : dict
-        Snakemake input files, may contain PTES temperature profiles.
-    return_temperature : xr.DataArray, optional
-        District heating return temperature profiles in °C. Required for PTES.
-
-    Returns
-    -------
-    float | xr.DataArray
-        Heat source cooling in Kelvin. Returns a float for most sources,
-        or a DataArray for PTES when temperatures vary with time.
-
-    Raises
-    ------
-    ValueError
-        If heat source is PTES but bottom temperature profile is not provided.
-    """
-    if heat_source_name == "ptes":
-        if "temp_ptes_bottom" not in snakemake_input.keys():
-            raise ValueError(
-                "PTES heat source requires bottom temperature profile "
-                "(temp_ptes_bottom) to calculate heat source cooling."
-            )
-        if return_temperature is None:
-            raise ValueError(
-                "PTES heat source requires return_temperature to calculate heat pump cooling."
-            )
-        ptes_bottom_temperature = xr.open_dataarray(snakemake_input["temp_ptes_bottom"])
-        return return_temperature - ptes_bottom_temperature
-    return default_heat_source_cooling
-
-
 if __name__ == "__main__":
     if "snakemake" not in globals():
         from scripts._helpers import mock_snakemake
@@ -241,14 +191,6 @@ if __name__ == "__main__":
     set_scenario_config(snakemake)
 
     heat_sources: list[str] = snakemake.params.heat_sources
-    ptes_enable: bool = snakemake.params.ptes_enable
-
-    # Validate PTES configuration
-    if ptes_enable and "ptes" not in heat_sources:
-        raise ValueError(
-            "PTES is enabled (district_heating.ptes.enable=true) but 'ptes' "
-            "is not in heat_sources.urban_central. PTES requires being listed in heat_sources to create the necessary buses and links for heat discharge to the 'urban central heat' bus."
-        )
 
     central_heating_forward_temperature: xr.DataArray = xr.open_dataarray(
         snakemake.input.central_heating_forward_temperature_profiles
@@ -282,12 +224,7 @@ if __name__ == "__main__":
                 ),
                 forward_temperature=central_heating_forward_temperature,
                 return_temperature=central_heating_return_temperature,
-                heat_source_cooling=get_heat_pump_cooling(
-                    heat_source_name=heat_source_key,
-                    default_heat_source_cooling=snakemake.params.heat_source_cooling,
-                    snakemake_input=snakemake.input,
-                    return_temperature=central_heating_return_temperature,
-                ),
+                heat_source_cooling=snakemake.params.heat_source_cooling,
             ).assign_coords(heat_source=heat_source_key)
             for heat_source_key in heat_sources
         ],
