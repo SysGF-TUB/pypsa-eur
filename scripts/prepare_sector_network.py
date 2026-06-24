@@ -2756,11 +2756,10 @@ def add_heat(
     hourly_heat_demand_total_file: str,
     ptes_e_max_pu_file: str,
     ptes_boost_per_discharge_profile_file: str,
-    ates_e_nom_max: str,
-    ates_capex_as_fraction_of_geothermal_heat_source: float,
-    ates_recovery_factor: float,
+    ates_potentials_file: str,
     enable_ates: bool,
     ates_marginal_cost_charger: float,
+    ates_lifetime: float,
     district_heat_info: pd.DataFrame,
     solar_thermal_total_file: str,
     retro_cost_file: str,
@@ -3185,8 +3184,20 @@ def add_heat(
             )
 
         if enable_ates and heat_system == HeatSystem.URBAN_CENTRAL:
+            ates_data = pd.read_csv(ates_potentials_file, index_col=0).reindex(
+                heat_nodes
+            )
+            ates_feasible = ates_data["feasible"].fillna(False).astype(bool)
+            # Infeasible regions (no ATES data) get e_nom_max=0.
+            ates_e_nom_max = pd.Series(
+                np.where(ates_feasible, np.inf, 0.0), index=heat_nodes
+            )
+            ates_capital_cost = ates_data["capital_cost"].fillna(0.0)
+            ates_standing_loss = ates_data["hourly_standing_losses"].fillna(0.0)
+
             n.add("Carrier", f"{heat_system} aquifer thermal energy storage")
 
+            # Storage medium bus.
             n.add(
                 "Bus",
                 heat_nodes + f" {heat_system} aquifer thermal energy storage",
@@ -3195,39 +3206,47 @@ def add_heat(
                 unit="MWh_th",
             )
 
+            # Charger: district heat -> ATES store. The per-region annualised
+            # CAPEX sits fully on the charger; the discharger capacity is forced
+            # equal in solve_network (add_TES_charger_ratio_constraints).
             n.add(
                 "Link",
-                heat_nodes + f" {heat_system} aquifer thermal energy storage charger",
+                heat_nodes,
+                suffix=f" {heat_system} aquifer thermal energy storage charger",
                 bus0=heat_nodes + f" {heat_system} heat",
                 bus1=heat_nodes + f" {heat_system} aquifer thermal energy storage",
                 efficiency=1.0,
                 carrier=f"{heat_system} aquifer thermal energy storage charger",
                 p_nom_extendable=True,
-                lifetime=costs.at["central geothermal heat source", "lifetime"],
+                lifetime=ates_lifetime,
                 marginal_cost=ates_marginal_cost_charger,
-                capital_cost=costs.at["central geothermal heat source", "capital_cost"]
-                * ates_capex_as_fraction_of_geothermal_heat_source
-                / 2,
+                capital_cost=ates_capital_cost,
             )
 
+            # ATES heat resource bus at the constant ATES top temperature. The
+            # generic heat-source loop boosts it to the forward temperature via a
+            # heat pump (no resistive boosting), making ATES a heat source.
+            n.add(
+                "Bus",
+                HeatSource.ATES.resource_bus(heat_nodes, heat_system),
+                location=heat_nodes,
+                carrier=f"{heat_system} {HeatSource.ATES} heat",
+                unit="MWh_th",
+            )
+
+            # Discharger: ATES store -> ATES heat resource bus. No CAPEX.
             n.add(
                 "Link",
-                heat_nodes
-                + f" {heat_system} aquifer thermal energy storage discharger",
-                bus1=heat_nodes + f" {heat_system} heat",
+                heat_nodes,
+                suffix=f" {heat_system} aquifer thermal energy storage discharger",
                 bus0=heat_nodes + f" {heat_system} aquifer thermal energy storage",
+                bus1=HeatSource.ATES.resource_bus(heat_nodes, heat_system),
                 efficiency=1.0,
                 carrier=f"{heat_system} aquifer thermal energy storage discharger",
                 p_nom_extendable=True,
-                lifetime=costs.at["central geothermal heat source", "lifetime"],
-                capital_cost=costs.at["central geothermal heat source", "capital_cost"]
-                * ates_capex_as_fraction_of_geothermal_heat_source
-                / 2,
+                lifetime=ates_lifetime,
             )
 
-            ates_e_nom_max_data = pd.read_csv(ates_e_nom_max, index_col=0)[
-                "ates_potential"
-            ]
             n.add(
                 "Store",
                 heat_nodes,
@@ -3235,10 +3254,10 @@ def add_heat(
                 bus=heat_nodes + f" {heat_system} aquifer thermal energy storage",
                 e_cyclic=True,
                 e_nom_extendable=True,
-                e_nom_max=ates_e_nom_max_data[heat_nodes],
+                e_nom_max=ates_e_nom_max,
                 carrier=f"{heat_system} aquifer thermal energy storage",
-                standing_loss=1 - ates_recovery_factor ** (1 / 8760),
-                lifetime=costs.at["central geothermal heat source", "lifetime"],
+                standing_loss=ates_standing_loss,
+                lifetime=ates_lifetime,
             )
 
         ## Add heat pumps
@@ -6429,15 +6448,12 @@ if __name__ == "__main__":
             heat_source_preheater_utilisation_profile_file=snakemake.input.heat_source_preheater_utilisation_profiles,
             hourly_heat_demand_total_file=snakemake.input.hourly_heat_demand_total,
             ptes_e_max_pu_file=snakemake.input.ptes_e_max_pu_profiles,
-            ates_e_nom_max=snakemake.input.ates_potentials,
-            ates_capex_as_fraction_of_geothermal_heat_source=snakemake.params.sector[
-                "district_heating"
-            ]["ates"]["capex_as_fraction_of_geothermal_heat_source"],
+            ates_potentials_file=snakemake.input.ates_potentials,
             ates_marginal_cost_charger=snakemake.params.sector["district_heating"][
                 "ates"
             ]["marginal_cost_charger"],
-            ates_recovery_factor=snakemake.params.sector["district_heating"]["ates"][
-                "recovery_factor"
+            ates_lifetime=snakemake.params.sector["district_heating"]["ates"][
+                "lifetime"
             ],
             enable_ates=snakemake.params.sector["district_heating"]["ates"]["enable"],
             ptes_boost_per_discharge_profile_file=snakemake.input.ptes_boost_per_discharge_profiles,
